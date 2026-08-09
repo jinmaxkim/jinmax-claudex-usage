@@ -7,7 +7,7 @@ set -e
 
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
 # build.sh 와 같은 규칙으로 설치 위치를 고른다
-if [ -d /Applications ]; then
+if [ -w /Applications ]; then
     APP="/Applications/ClaudexUsage.app"
 else
     APP="$HOME/Applications/ClaudexUsage.app"

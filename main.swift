@@ -32,15 +32,24 @@ func loadSnapshot() -> Snapshot? {
           let raw = root["samples"] as? [[String: Any]]
     else { return nil }
 
-    let samples: [(t: Double, fh: Int, sd: Int)] = raw.compactMap { s in
+    let allSamples: [(t: Double, fh: Int, sd: Int, org: String?)] = raw.compactMap { s in
         guard let ms = s["t"] as? Double else { return nil }
         let u = s["u"] as? [String: Any]
         return (
             ms / 1000,
             (u?["fh"] as? NSNumber)?.intValue ?? 0,
-            (u?["sd"] as? NSNumber)?.intValue ?? 0
+            (u?["sd"] as? NSNumber)?.intValue ?? 0,
+            s["org"] as? String
         )
     }
+
+    guard let newest = allSamples.max(by: { $0.t < $1.t }) else { return nil }
+
+    // 파일에는 계정/조직을 바꾼 기록도 함께 남는다. 다른 조직의 값 하락을
+    // 한도 리셋으로 오인하지 않도록, 최신 기록과 같은 조직만 사용한다.
+    let samples = allSamples
+        .filter { newest.org == nil || $0.org == newest.org }
+        .sorted { $0.t < $1.t }
 
     guard let last = samples.last else { return nil }
     guard samples.count > 1 else {
@@ -105,7 +114,20 @@ func loadSnapshot() -> Snapshot? {
 
 // Codex는 사용량을 디스크에 남기지 않는다. app-server에 JSON-RPC로 물어봐야 한다.
 // 일반 호출이 아니라 계정 조회라 토큰 사용량은 늘지 않지만, 프로세스를 띄우므로 자주 부르지 않는다.
-private let codexExecutable = "/Applications/ChatGPT.app/Contents/Resources/codex"
+private func applicationBundlePath(named name: String) -> String? {
+    let fm = FileManager.default
+    let filename = "\(name).app"
+    let candidates = [
+        URL(fileURLWithPath: "/Applications", isDirectory: true),
+        fm.homeDirectoryForCurrentUser.appendingPathComponent(
+            "Applications", isDirectory: true
+        )
+    ] + fm.urls(for: .applicationDirectory, in: [.localDomainMask, .userDomainMask])
+
+    return candidates
+        .map { $0.appendingPathComponent(filename).path }
+        .first { fm.fileExists(atPath: $0) }
+}
 
 struct CodexLimit {
     var usedPercent: Int
@@ -123,7 +145,10 @@ struct CodexLimit {
 }
 
 func loadCodexLimits() -> [CodexLimit] {
-    guard FileManager.default.isExecutableFile(atPath: codexExecutable) else {
+    guard
+        let codexExecutable,
+        FileManager.default.isExecutableFile(atPath: codexExecutable)
+    else {
         return []
     }
 
@@ -212,13 +237,19 @@ func loadCodexLimits() -> [CodexLimit] {
 
 // MARK: - 아이콘
 
-private let claudeAppPath = "/Applications/Claude.app"
-private let chatgptAppPath = "/Applications/ChatGPT.app"
+private let claudeAppPath = applicationBundlePath(named: "Claude")
+private let chatgptAppPath = applicationBundlePath(named: "ChatGPT")
+private let codexExecutable = chatgptAppPath.map {
+    URL(fileURLWithPath: $0)
+        .appendingPathComponent("Contents/Resources/codex")
+        .path
+}
 
 /// 앱 번들의 공식 아이콘을 그대로 가져온다.
 /// NSWorkspace가 돌려주는 인스턴스는 공유될 수 있어 복사한 뒤 크기를 바꾼다.
-private func appIcon(atPath path: String, size: CGFloat) -> NSImage? {
+private func appIcon(atPath path: String?, size: CGFloat) -> NSImage? {
     guard
+        let path,
         FileManager.default.fileExists(atPath: path),
         let icon = NSWorkspace.shared.icon(forFile: path).copy() as? NSImage
     else {
@@ -676,8 +707,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let fm = FileManager.default
 
         if fm.fileExists(atPath: loginPlistURL.path) {
-            try? fm.removeItem(at: loginPlistURL)
-            sender.state = .off
+            do {
+                try fm.removeItem(at: loginPlistURL)
+                sender.state = .off
+            } catch {
+                showLoginItemError(error)
+            }
             return
         }
 
@@ -704,13 +739,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 </plist>
 """
 
-        try? plist.write(
-            to: loginPlistURL,
-            atomically: true,
-            encoding: .utf8
-        )
+        do {
+            try fm.createDirectory(
+                at: loginPlistURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            try plist.write(
+                to: loginPlistURL,
+                atomically: true,
+                encoding: .utf8
+            )
+            sender.state = .on
+        } catch {
+            showLoginItemError(error)
+        }
+    }
 
-        sender.state = .on
+    private func showLoginItemError(_ error: Error) {
+        let alert = NSAlert(error: error)
+        alert.messageText = "자동 실행 설정을 변경할 수 없습니다"
+        alert.runModal()
     }
 }
 
