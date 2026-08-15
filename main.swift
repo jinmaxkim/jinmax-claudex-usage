@@ -404,6 +404,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem = NSStatusBar.system.statusItem(
             withLength: NSStatusItem.variableLength
         )
+        statusItem.autosaveName = "local.claudex-usage.status-item"
 
         let menu = NSMenu()
 
