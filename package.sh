@@ -6,15 +6,10 @@
 set -e
 
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
-# build.sh 와 같은 규칙으로 설치 위치를 고른다
-if [ -w /Applications ]; then
-    APP="/Applications/ClaudexUsage.app"
-else
-    APP="$HOME/Applications/ClaudexUsage.app"
-fi
+APP="$SRC_DIR/.build/ClaudexUsage.app"
 DIST="$SRC_DIR/dist"
 
-# 항상 최신 소스로 다시 빌드해서 담는다 (실행 중이면 앱은 여기서 종료된다)
+# 항상 최신 소스로 다시 빌드해서 담는다
 "$SRC_DIR/build.sh" >/dev/null
 
 VERSION=$(defaults read "$APP/Contents/Info.plist" CFBundleShortVersionString 2>/dev/null || echo "1.0")

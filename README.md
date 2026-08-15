@@ -18,15 +18,21 @@ macOS 메뉴 막대에서 Claude와 Codex의 사용량을 한눈에 확인하는
 - Claude 사용량을 표시하려면 Claude 데스크톱 앱
 - Codex 사용량을 표시하려면 ChatGPT 앱에 포함된 Codex 실행 파일
 
-## 설치 및 실행
+## 빌드, 설치 및 실행
 
-저장소를 내려받은 뒤 아래 명령을 실행합니다.
+저장소를 내려받은 뒤 아래 명령으로 앱을 빌드합니다.
 
 ```bash
 ./build.sh
 ```
 
-스크립트는 앱을 빌드해 `/Applications`에 설치하며, 해당 위치에 쓸 수 없는 경우 사용자 응용 프로그램 폴더에 설치합니다. 설치 후 Finder에서 앱을 열거나 다음처럼 실행할 수 있습니다.
+빌드된 앱은 `.build/ClaudexUsage.app`에 생성됩니다. 응용 프로그램 폴더에 설치하려면 다음 명령을 실행합니다.
+
+```bash
+./install.sh
+```
+
+설치 스크립트는 최신 소스를 빌드한 뒤 `/Applications`에 설치하며, 해당 위치에 쓸 수 없는 경우 사용자 응용 프로그램 폴더에 설치합니다. 설치 후 Finder에서 앱을 열거나 다음처럼 실행할 수 있습니다.
 
 ```bash
 open -a ClaudexUsage
@@ -36,7 +42,7 @@ open -a ClaudexUsage
 
 ## 빌드 및 배포
 
-개발 중에는 `build.sh`로 앱 번들을 다시 만들 수 있습니다. 배포용 DMG는 다음 명령으로 생성합니다.
+개발 중에는 `build.sh`로 앱 번들을 다시 만들고, `install.sh`로 로컬에 설치할 수 있습니다. 배포용 DMG는 다음 명령으로 생성합니다.
 
 ```bash
 ./package.sh

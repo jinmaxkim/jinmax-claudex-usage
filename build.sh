@@ -1,14 +1,9 @@
 #!/bin/bash
-# ClaudexUsage.app 빌드 및 설치 (Xcode 없이 swiftc 만 사용)
+# ClaudexUsage.app 빌드 (Xcode 없이 swiftc 만 사용)
 set -e
 
 SRC_DIR="$(cd "$(dirname "$0")" && pwd)"
-# 응용 프로그램 폴더에 설치한다 (내 홈 폴더에 설치됨)
-if [ -w "/Applications" ]; then
-    APP="/Applications/ClaudexUsage.app"
-else
-    APP="$HOME/Applications/ClaudexUsage.app"
-fi
+APP="$SRC_DIR/.build/ClaudexUsage.app"
 BIN="$SRC_DIR/.build/ClaudexUsage"
 
 mkdir -p "$SRC_DIR/.build"
@@ -27,9 +22,7 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns "$ICONSET" -o "$SRC_DIR/.build/AppIcon.icns"
 
-echo "앱 구성: $APP"
-# 실행 중이면 먼저 내린다 (같은 경로에 덮어쓰기 위해)
-pkill -x ClaudexUsage 2>/dev/null || true
+echo "앱 번들 구성: $APP"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN" "$APP/Contents/MacOS/ClaudexUsage"
@@ -59,4 +52,4 @@ PLIST
 codesign --force --sign - "$APP" 2>/dev/null || echo "(codesign 실패)"
 
 echo "완료: $APP"
-echo "실행: open -a \"$APP\""
+echo "설치: $SRC_DIR/install.sh"
