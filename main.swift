@@ -7,7 +7,8 @@
 //   samples[].t = 기록 시각(ms epoch), .u.fh = 5시간 사용률(%), .u.sd = 주간(7일) 사용률(%)
 //
 // 재설정 시각은 파일에 없으므로 히스토리에서 역산한다.
-//   5시간 - 마지막 리셋 이후 사용률이 0에서 올라간 시점 + 5시간 (기록 간격 때문에 ±5분 오차)
+//   5시간 - 마지막 리셋 이후 사용률이 0에서 올라간 구간의 중간 시각 + 5시간
+//           (기록 간격의 절반만큼 오차가 남는다)
 //   주간   - 마지막 리셋 + 7일, 7일 주기가 일정해 기록이 비어도 보정된다.
 //
 
@@ -68,15 +69,21 @@ func loadSnapshot() -> Snapshot? {
         fhResetIdx = i
     }
 
+    // 실제 창 시작은 "마지막 0 기록"과 "처음 0보다 커진 기록" 사이 어딘가다.
+    // 뒤쪽 기록만 쓰면 재설정 시각이 기록 간격만큼 늘 늦게 나오므로 중간값을 쓴다.
+    func midpoint(_ i: Int) -> Double {
+        i > 0 ? (samples[i - 1].t + samples[i].t) / 2 : samples[i].t
+    }
+
     // 리셋 직후 값이 이미 0보다 크면(100% → 1%처럼) 그 지점을 새 시작점으로 본다
     var fhStart: Double?
     if let r = fhResetIdx {
         if samples[r].fh > 0 {
-            fhStart = samples[r].t
+            fhStart = midpoint(r)
         } else if r + 1 < samples.count {
             for i in (r + 1)..<samples.count
             where samples[i].fh > 0 && samples[i - 1].fh == 0 {
-                fhStart = samples[i].t
+                fhStart = midpoint(i)
                 break
             }
         }
@@ -599,6 +606,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
                 if let t = resetText(snap.sdReset) {
                     addInfo(menu, "  \(t)")
+                } else {
+                    // 기록에 주간 사용률 하락(리셋)이 아직 없으면 주기를 역산할 수 없다
+                    addInfo(menu, "  재설정 시각 추정 중 · 주간 리셋 기록 없음")
                 }
 
                 menu.addItem(.separator())
@@ -770,8 +780,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 if CommandLine.arguments.contains("--print") {
 
     if let snap = loadSnapshot() {
-        print("Claude 5시간 : \(snap.fh)%")
-        print("Claude 주간  : \(snap.sd)%")
+        print("Claude 5시간 : \(snap.fh)% (\(resetText(snap.fhReset) ?? "재설정 시각 알 수 없음"))")
+        print("Claude 주간  : \(snap.sd)% (\(resetText(snap.sdReset) ?? "재설정 시각 알 수 없음"))")
+        print("기록 시각    : \(hhmm(snap.recordedAt))")
     }
 
     for limit in loadCodexLimits() {
